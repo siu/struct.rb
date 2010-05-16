@@ -1,0 +1,33 @@
+/* Layout */
+@import "screen.css";
+body {
+    background-color: #eee;
+}
+
+a{text-decoration:none;border-bottom:solid 1px #404080;color: #404080;}
+a:hover{color:#933;border-bottom:solid 1px #933;background-color:#fff}
+a img, table input {vertical-align: text-bottom;}
+@import "lib.less";
+
+#header {
+        .span-12;
+        .last;
+}
+
+.struct {
+        height: 200px;
+        overflow: auto;
+        background-color: #fff;
+}
+
+#files {
+        .column;
+        .span-12;
+}
+
+#methods {
+        .column;
+        .span-12;
+        .last;
+}
+

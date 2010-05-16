@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title><%= $project_title %></title>
+    <link href="css/gfx.css" media="screen" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="css/print.css" type="text/css" media="print"/>
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="css/ie.css" type="text/css" media="screen, projection"/>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="container">
+      <div id="header">
+        <h1><%= $project_title %></h1>
+      </div>
+
+      <div id="files" class="struct">
+        <h2>Files</h2>
+        <ul>
+          <% for file in structure.files_info do %>
+            <li><a href="<%= file.filename.to_html_page %>"><%= file.filename %></a></li>
+          <% end %>
+        </ul>
+      </div>
+
+      <div id="methods" class="struct">
+        <h2>Methods</h2>
+        <ul>
+          <% for method in structure.all_methods do %>
+            <li><a href="<%= method.name.to_html_page %>"><%= method.name %></a></li>
+          <% end %>
+        </ul>
+      </div>
+
+      <h2>Call tree</h2>
+      <ul>
+        <% while cmethod = methods.shift do %>
+          <% if cmethod.respond_to?(:any?) %>
+            <% if cmethod.any? %>
+              <ul>
+                <% cmethod.each do |m| %>
+                  <li><a href="<%= m.name.to_html_page %>"><%= m.name %></a></li>
+                <% end %>
+              </ul>
+            <% end %>
+            </li>
+          <% else %>
+            <li><a href="<%= cmethod.name.to_html_page %>"><%= cmethod.name %></a>
+            <% methods.unshift(cmethod.calls) %>
+          <% end %>
+        <% end %>
+      </ul>
+      <%= FOOTER %>
+
+    </div>
+  </body>
+</html>

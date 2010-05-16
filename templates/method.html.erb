@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title><%= m.name %></title>
+    <link href="css/gfx.css" media="screen" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="css/uv/<%= THEME %>.css" type="text/css" media="screen" />
+    <link rel="stylesheet" href="css/print.css" type="text/css" media="print"/>
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="css/ie.css" type="text/css" media="screen, projection"/>
+    <![endif]-->
+
+  </head>
+  <body>
+    <div class="container">
+
+      <div id="header">
+        <h1><%= m.name %></h1>
+      </div>
+
+      <div class="method-info">File: <%= m.file.filename %></div>
+
+      <h2>All calls</h2>
+      <ul>
+        <% m.calls.each do |c| %>
+          <li><a href="<%= c.name.to_html_page %>"><%= c.name %></a></li>
+        <% end %>
+      </ul>
+
+      <h2>Source code</h2>
+      <code>
+        <pre>
+<%= highlight(m.source) %>
+      </pre>
+      </code>
+      <%= FOOTER %>
+    </div>
+  </body>
+</html>

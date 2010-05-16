@@ -5,19 +5,21 @@
 # Fortran Structure extractor ;)
 #
 
+require 'rubygems'
 require 'optparse'
+require 'fileutils'
 require 'erb'
 require 'uv'
 
 $project_title = 'Unnamed'
 FOOTER = %q{<p><em>Analysis by struct.rb - David Siñuela Pastor</em></p>}
+TEMPLATE_DIR = 'templates'
 
 class StructureExtractor
   attr_accessor :all_methods, :all_function_names, :files_info, :files
 
   def initialize(path)
     @dir = path
-    Dir.chdir(@dir)
 
     pattern = File.join(@dir, '**', '*.f')
     @files = Dir.glob(pattern)
@@ -61,99 +63,39 @@ class StructureExtractorHtmlOutput
   def self.write_output(structure, output_path)
     s = structure
     Dir.mkdir(output_path)
-    Dir.chdir(output_path)
-    Uv.copy_files "xhtml", "."
-    write_index_to_file(structure)
+    FileUtils.cp_r('css', output_path)
+    write_index_to_file(structure, File.join(output_path, 'index.html'))
 
     s.all_methods.each do |m|
-      write_method_to_file(m, m.name.to_html_page)
+      write_method_to_file(m, File.join(output_path, m.name.to_html_page))
     end
   end
 
-  def self.write_index_to_file(structure)
-    filename = "index.html"
+  def self.write_index_to_file(structure, file_path)
     methods = structure.all_methods.clone
-    template = %q{
-      <!DOCTYPE html>
-      <html>
-      <head>
-              <meta charset="utf-8">
-              <title><%= $project_title %></title>
-              <link rel="stylesheet" href="css/<%= THEME %>.css" type="text/css" media="screen" />
-      </head>
-      <body>
-      <h1><%= $project_title %></h1>
+    template = self.read_template('index.html.erb')
 
-      <h2>Call tree</h2>
-      <ul>
-      <% while cmethod = methods.shift do %>
-        <% if cmethod.respond_to?(:any?) %>
-          <% if cmethod.any? %>
-            <ul>
-              <% cmethod.each do |m| %>
-                <li><a href="<%= m.name.to_html_page %>"><%= m.name %></a></li>
-              <% end %>
-            </ul>
-          <% end %>
-          </li>
-        <% else %>
-          <li><a href="<%= cmethod.name.to_html_page %>"><%= cmethod.name %></a>
-          <% methods.unshift(cmethod.calls) %>
-        <% end %>
-      <% end %>
-      </ul>
-      <%= FOOTER %>
-
-      </body>
-      </html>
-    }
-
-    puts "Writing file #{filename}"
+    puts "Writing file #{file_path}"
 
     output = ERB.new(template).result(binding)
-    self.write_to_file(filename, output)
+    self.write_to_file(file_path, output)
   end
 
   def self.highlight(text)
     result = Uv.parse( text, "xhtml", "fortran", true, "dawn")
   end
 
-  def self.write_method_to_file(m, filename)
-    filename = m.name.to_html_page
-    template = %q{
-      <!DOCTYPE html>
-      <html>
-      <head>
-              <meta charset="utf-8">
-              <title><%= m.name %></title>
-              <link rel="stylesheet" href="css/<%= THEME %>.css" type="text/css" media="screen" />
-      </head>
-      <body>
-      <h1><%= m.name %></h1>
-      <div class="method-info">File: <%= m.file.filename %></div>
+  def self.read_template(template)
+    File.read(File.join(TEMPLATE_DIR, template))
+  end
 
-      <h2>All calls</h2>
-      <ul>
-        <% m.calls.each do |c| %>
-          <li><a href="<%= c.name.to_html_page %>"><%= c.name %></a></li>
-        <% end %>
-      </ul>
+  def self.write_method_to_file(m, file_path)
+    template = self.read_template('method.html.erb')
 
-      <h2>Source code</h2>
-      <code>
-      <pre>
-<%= highlight(m.source) %>
-      </pre>
-      </code>
-      <%= FOOTER %>
-      </body>
-      </html>
-    }
-
-    puts "Writing file #{filename}"
+    puts "Writing file #{file_path}"
 
     output = ERB.new(template).result(binding)
-    self.write_to_file(filename, output)
+    self.write_to_file(file_path, output)
   end
 private
   def self.write_to_file(filename, contents)
@@ -181,10 +123,12 @@ private
   def extract_methods(filename)
     file = File.open(filename)
 
+    declaration = Regexp.new(/^[^!*c]\s*(?:\w+\s+)*(function|subroutine)[ \t]+(\w+).*$/i)
+
     last_line = 0
     methods = file.lines.map do |line|
       last_line += 1
-      m =line.scan(/^[^!*c]\s*(?:\w+\s+)*(function|subroutine)[ \t]+(\w+).*$/i).map do |e| 
+      m =line.scan(declaration).map do |e| 
         MethodDefinition.new(e.join(':'), self, $., $.+1)
       end
       m.each { |m| puts "Found #{m.name}" }
@@ -236,15 +180,17 @@ class MethodDefinition
   end
 
   def extract_subroutine_calls(all_methods)
+    sub_call = Regexp.new(/^[^*c]\s*call[ \t]+(\w+)/i)
     call_lines = File.open(file.filename).entries[start_line..end_line-1].map do |line|
-      line.scan(/^[^*c]\s*call[ \t]+(\w+)/i).flatten.uniq.collect(&:downcase)
+      line.scan(sub_call).flatten.uniq.collect(&:downcase)
     end.compact.flatten.uniq.sort
     call_lines.map{ |c| all_methods.find { |m| m.name == "subroutine:#{c}" } }.compact
   end
 
   def extract_function_calls(function_list, all_methods)
+    fun_call = Regexp.new(/^[^*c]\s*.*(#{function_list.join("|")})\(/i)
     call_lines = File.open(file.filename).entries[start_line..end_line-1].map do |line|
-      line.scan(/^[^*c]\s*.*(#{function_list.join("|")})/i).flatten.uniq.collect(&:downcase)
+      line.scan(fun_call).flatten.uniq.collect(&:downcase)
     end.compact.flatten.uniq.sort
     call_lines.map{|c| all_methods.find { |m| m.name == "function:#{c}" } }.compact
   end
@@ -266,6 +212,7 @@ private
 
 end
 
+$directory = 'doc'
 opts = OptionParser.new(ARGV) do |o|
   o.banner = 'Usage: struct.rb [options] source_directory'
   o.on('-d DIRECTORY', '--directory', 'Output directory') { |d| $directory = d}
