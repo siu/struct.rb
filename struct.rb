@@ -76,7 +76,10 @@ class StructureExtractorHtmlOutput
   end
 
   def self.generate_graph(structure, output_path)
-    g = GraphViz::new( 'Structure', :type => :digraph)
+    g = GraphViz::new( :G, :type => :digraph)
+    g.node[:style] = :filled
+    g.node[:shape] = :box
+
     h = Hash.new
     
     structure.all_methods.each do |m|
@@ -93,6 +96,8 @@ class StructureExtractorHtmlOutput
       end
     end
 
+    puts 'Writing graph pdf...'
+    g.output(:pdf => File.join(output_path, 'struct.pdf'))
     puts 'Writing graph to file...'
     g.output(:png => File.join(output_path, 'struct.png'))
   end
