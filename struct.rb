@@ -93,6 +93,7 @@ class StructureExtractorHtmlOutput
       end
     end
 
+    puts 'Writing graph to file...'
     g.output(:png => File.join(output_path, 'struct.png'))
   end
 
@@ -148,7 +149,7 @@ private
   def extract_methods(filename)
     file = File.open(filename)
 
-    declaration = Regexp.new(/^[^!*c]\s*(?:\w+\s+)*(function|subroutine)[ \t]+(\w+).*$/i)
+    declaration = Regexp.new(/^[^!*c]\s*(?:[\w\*]+\s+)*(program|function|subroutine)[ \t]+(\w+).*$/i)
 
     last_line = 0
     methods = file.lines.map do |line|
@@ -213,7 +214,7 @@ class MethodDefinition
   end
 
   def extract_function_calls(function_list, all_methods)
-    fun_call = Regexp.new(/^[^*c]\s*.*(#{function_list.join("|")})\(/i)
+    fun_call = Regexp.new(/^[^*c].*(#{function_list.join("|")})\s*\(/i)
     call_lines = File.open(file.filename).entries[start_line..end_line-1].map do |line|
       line.scan(fun_call).flatten.uniq.collect(&:downcase)
     end.compact.flatten.uniq.sort
