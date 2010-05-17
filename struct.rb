@@ -10,6 +10,7 @@ require 'optparse'
 require 'fileutils'
 require 'erb'
 require 'uv'
+require 'graphviz'
 
 $project_title = 'Unnamed'
 FOOTER = %q{<p><em>Analysis by <a href="http://github.com/siu/struct.rb">struct.rb</a> - David Siñuela Pastor</em></p>}
@@ -70,6 +71,29 @@ class StructureExtractorHtmlOutput
     s.all_methods.each do |m|
       write_method_to_file(m, File.join(output_path, m.name.to_html_page))
     end
+
+    self.generate_graph(structure, output_path)
+  end
+
+  def self.generate_graph(structure, output_path)
+    g = GraphViz::new( 'Structure', :type => :digraph)
+    h = Hash.new
+    
+    structure.all_methods.each do |m|
+      h[m.name] = g.add_node(m.to_s)
+    end
+
+    puts "Adding edges"
+    structure.all_methods.each do |m|
+      m.calls.each do |callee|
+        puts "Adding edge from #{m.name} to #{callee.name}"
+        if !h[m.name].nil? && !h[callee.name].nil?
+          g.add_edge(h[m.name], h[callee.name])
+        end
+      end
+    end
+
+    g.output(:png => File.join(output_path, 'struct.png'))
   end
 
   def self.write_index_to_file(structure, file_path)
