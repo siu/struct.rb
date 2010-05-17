@@ -92,7 +92,6 @@ class StructureExtractorHtmlOutput
     puts "Adding edges"
     structure.all_methods.each do |m|
       m.calls.each do |callee|
-        puts "Adding edge from #{m.name} to #{callee.name}"
         if !h[m.name].nil? && !h[callee.name].nil?
           g.add_edge(h[m.name], h[callee.name])
         end
@@ -125,7 +124,7 @@ class StructureExtractorHtmlOutput
       end
     end
 
-    puts 'Writing graph to file #{image_path}'
+    puts "Writing graph to file #{image_path}"
     g.output(:png => image_path)
   end
 
