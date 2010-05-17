@@ -12,7 +12,7 @@ require 'erb'
 require 'uv'
 
 $project_title = 'Unnamed'
-FOOTER = %q{<p><em>Analysis by struct.rb - David Siñuela Pastor</em></p>}
+FOOTER = %q{<p><em>Analysis by <a href="http://github.com/siu/struct.rb">struct.rb</a> - David Siñuela Pastor</em></p>}
 TEMPLATE_DIR = 'templates'
 
 class StructureExtractor
@@ -62,8 +62,9 @@ class StructureExtractorHtmlOutput
   THEME = 'dawn'
   def self.write_output(structure, output_path)
     s = structure
-    Dir.mkdir(output_path)
-    FileUtils.cp_r('css', output_path)
+    FileUtils.rm_r(output_path, :force => true)
+    FileUtils.mkdir_p(output_path)
+    FileUtils.cp_r(File.join($base_path, 'css'), output_path)
     write_index_to_file(structure, File.join(output_path, 'index.html'))
 
     s.all_methods.each do |m|
@@ -86,7 +87,7 @@ class StructureExtractorHtmlOutput
   end
 
   def self.read_template(template)
-    File.read(File.join(TEMPLATE_DIR, template))
+    File.read(File.join($base_path, TEMPLATE_DIR, template))
   end
 
   def self.write_method_to_file(m, file_path)
@@ -212,7 +213,7 @@ private
 
 end
 
-$directory = 'doc'
+$directory = 'doc/structure'
 opts = OptionParser.new(ARGV) do |o|
   o.banner = 'Usage: struct.rb [options] source_directory'
   o.on('-d DIRECTORY', '--directory', 'Output directory') { |d| $directory = d}
@@ -222,5 +223,6 @@ opts = OptionParser.new(ARGV) do |o|
 end
 path = File.join(File.expand_path('.'), $directory)
 
+$base_path = File.expand_path(File.dirname(__FILE__))
 s = StructureExtractor.new(File.expand_path(ARGV.last))
 StructureExtractorHtmlOutput::write_output(s, path)
