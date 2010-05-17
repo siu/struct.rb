@@ -66,9 +66,12 @@ class StructureExtractorHtmlOutput
     FileUtils.rm_r(output_path, :force => true)
     FileUtils.mkdir_p(output_path)
     FileUtils.cp_r(File.join($base_path, 'css'), output_path)
+    FileUtils.mkdir_p(File.join(output_path, 'img'))
+    FileUtils.mkdir_p(File.join(output_path, 'pdf'))
     write_index_to_file(structure, File.join(output_path, 'index.html'))
 
     s.all_methods.each do |m|
+      self.graph_for_method(m, File.join(output_path, 'img', "#{m.name}.png"))
       write_method_to_file(m, File.join(output_path, m.name.to_html_page))
     end
 
@@ -97,9 +100,33 @@ class StructureExtractorHtmlOutput
     end
 
     puts 'Writing graph pdf...'
-    g.output(:pdf => File.join(output_path, 'struct.pdf'))
+    g.output(:pdf => File.join(output_path, 'pdf', 'struct.pdf'))
     puts 'Writing graph to file...'
-    g.output(:png => File.join(output_path, 'struct.png'))
+    g.output(:png => File.join(output_path, 'img', 'struct.png'))
+  end
+
+  def self.graph_for_method(method, image_path)
+    g = GraphViz::new( :G, :type => :digraph)
+    g.node[:style] = :filled
+    g.node[:shape] = :box
+
+    h = Hash.new
+
+    h[method.name] = g.add_node(method.to_s)
+    
+    method.calls.each do |m|
+      h[m.name] = g.add_node(m.to_s)
+    end
+
+    puts "Adding edges..."
+    method.calls.each do |callee|
+      if !h[callee.name].nil?
+        g.add_edge(h[method.name], h[callee.name])
+      end
+    end
+
+    puts 'Writing graph to file #{image_path}'
+    g.output(:png => image_path)
   end
 
   def self.write_index_to_file(structure, file_path)
