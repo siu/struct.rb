@@ -31,7 +31,7 @@ class StructureExtractor
     end
 
     @all_methods = @files_info.map { |fi| fi.methods }.flatten.uniq {|a,b| a.name <=> b.name }.sort {|a,b| a.name <=> b.name }
-    @all_function_names = @all_methods.collect { |m| m.name.scan(/^function:(\w*)/i) }.flatten.sort.uniq
+    @all_function_names = @all_methods.collect { |m| m.name.scan(/^function:(\w+)/i) }.flatten.sort.uniq
     @files_info.each do |f|
       puts "File #{f.filename}..."
       f.methods.each do |m|
@@ -180,7 +180,7 @@ private
   def extract_methods(filename)
     file = File.open(filename)
 
-    declaration = Regexp.new(/^[^!*c]\s*(?:[\w\*]+\s+)*(program|function|subroutine)[ \t]+(\w+).*$/i)
+    declaration = Regexp.new(/^[^!*c]\s*(?:[\w\*]+\s+)*(program|function|subroutine|entry)[ \t]+(\w+).*$/i)
 
     last_line = 0
     methods = file.lines.map do |line|
@@ -241,7 +241,8 @@ class MethodDefinition
     call_lines = File.open(file.filename).entries[start_line..end_line-1].map do |line|
       line.scan(sub_call).flatten.uniq.collect(&:downcase)
     end.compact.flatten.uniq.sort
-    call_lines.map{ |c| all_methods.find { |m| m.name == "subroutine:#{c}" } }.compact
+    expr = Regexp.new(/(subroutine|entry):#{c}/)
+    call_lines.map{ |c| all_methods.find { |m| m.name =~ expr } }.compact
   end
 
   def extract_function_calls(function_list, all_methods)
@@ -249,7 +250,8 @@ class MethodDefinition
     call_lines = File.open(file.filename).entries[start_line..end_line-1].map do |line|
       line.scan(fun_call).flatten.uniq.collect(&:downcase)
     end.compact.flatten.uniq.sort
-    call_lines.map{|c| all_methods.find { |m| m.name == "function:#{c}" } }.compact
+    expr = Regexp.new(/function:#{c}/)
+    call_lines.map{|c| all_methods.find { |m| m.name =~ expr } }.compact
   end
 
   def to_s
