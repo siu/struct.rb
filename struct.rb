@@ -59,109 +59,6 @@ class String
   end
 end
 
-class StructureExtractorHtmlOutput
-  THEME = 'dawn'
-  def self.write_output(structure, output_path)
-    s = structure
-    FileUtils.rm_r(output_path, :force => true)
-    FileUtils.mkdir_p(output_path)
-    FileUtils.cp_r(File.join($base_path, 'css'), output_path)
-    FileUtils.mkdir_p(File.join(output_path, 'img'))
-    FileUtils.mkdir_p(File.join(output_path, 'pdf'))
-    write_index_to_file(structure, File.join(output_path, 'index.html'))
-
-    s.all_methods.each do |m|
-      self.graph_for_method(m, File.join(output_path, 'img', "#{m.name}.png"))
-      write_method_to_file(m, File.join(output_path, m.name.to_html_page))
-    end
-
-    self.generate_graph(structure, output_path)
-  end
-
-  def self.generate_graph(structure, output_path)
-    g = GraphViz::new( :G, :type => :digraph)
-    g.node[:style] = :filled
-    g.node[:shape] = :box
-
-    h = Hash.new
-    
-    structure.all_methods.each do |m|
-      h[m.name] = g.add_node(m.to_s)
-    end
-
-    puts "Adding edges"
-    structure.all_methods.each do |m|
-      m.calls.each do |callee|
-        if !h[m.name].nil? && !h[callee.name].nil?
-          g.add_edge(h[m.name], h[callee.name])
-        end
-      end
-    end
-
-    puts 'Writing graph pdf...'
-    g.output(:pdf => File.join(output_path, 'pdf', 'struct.pdf'))
-    puts 'Writing graph to file...'
-    g.output(:png => File.join(output_path, 'img', 'struct.png'))
-  end
-
-  def self.graph_for_method(method, image_path)
-    g = GraphViz::new( :G, :type => :digraph)
-    g.node[:style] = :filled
-    g.node[:shape] = :box
-
-    h = Hash.new
-
-    h[method.name] = g.add_node(method.to_s)
-    
-    method.calls.each do |m|
-      h[m.name] = g.add_node(m.to_s)
-    end
-
-    puts "Adding edges..."
-    method.calls.each do |callee|
-      if !h[callee.name].nil?
-        g.add_edge(h[method.name], h[callee.name])
-      end
-    end
-
-    puts "Writing graph to file #{image_path}"
-    g.output(:png => image_path)
-  end
-
-  def self.write_index_to_file(structure, file_path)
-    methods = structure.all_methods.clone
-    template = self.read_template('index.html.erb')
-
-    puts "Writing file #{file_path}"
-
-    output = ERB.new(template).result(binding)
-    self.write_to_file(file_path, output)
-  end
-
-  def self.highlight(text)
-    result = Uv.parse( text, "xhtml", "fortran", true, "dawn")
-  end
-
-  def self.read_template(template)
-    File.read(File.join($base_path, TEMPLATE_DIR, template))
-  end
-
-  def self.write_method_to_file(m, file_path)
-    template = self.read_template('method.html.erb')
-
-    puts "Writing file #{file_path}"
-
-    output = ERB.new(template).result(binding)
-    self.write_to_file(file_path, output)
-  end
-private
-  def self.write_to_file(filename, contents)
-    file = File.open(filename, 'w+')
-    file.write contents
-    file.close
-  end
-end
-
 class FortranFile
 
   attr_accessor :filename
@@ -268,8 +165,111 @@ private
     @lines = end_line - start_line
   end
 
-
 end
+
+class StructureExtractorHtmlOutput
+  THEME = 'dawn'
+  def self.write_output(structure, output_path)
+    s = structure
+    FileUtils.rm_r(output_path, :force => true)
+    FileUtils.mkdir_p(output_path)
+    FileUtils.cp_r(File.join($base_path, 'css'), output_path)
+    FileUtils.mkdir_p(File.join(output_path, 'img'))
+    FileUtils.mkdir_p(File.join(output_path, 'pdf'))
+    write_index_to_file(structure, File.join(output_path, 'index.html'))
+
+    s.all_methods.each do |m|
+      self.graph_for_method(m, File.join(output_path, 'img', "#{m.name}.png"))
+      write_method_to_file(m, File.join(output_path, m.name.to_html_page))
+    end
+
+    self.generate_graph(structure, output_path)
+  end
+
+  def self.generate_graph(structure, output_path)
+    g = GraphViz::new( :G, :type => :digraph)
+    g.node[:style] = :filled
+    g.node[:shape] = :box
+
+    h = Hash.new
+    
+    structure.all_methods.each do |m|
+      h[m.name] = g.add_node(m.to_s)
+    end
+
+    puts "Adding edges"
+    structure.all_methods.each do |m|
+      m.calls.each do |callee|
+        if !h[m.name].nil? && !h[callee.name].nil?
+          g.add_edge(h[m.name], h[callee.name])
+        end
+      end
+    end
+
+    puts 'Writing graph pdf...'
+    g.output(:pdf => File.join(output_path, 'pdf', 'struct.pdf'))
+    puts 'Writing graph to file...'
+    g.output(:png => File.join(output_path, 'img', 'struct.png'))
+  end
+
+  def self.graph_for_method(method, image_path)
+    g = GraphViz::new( :G, :type => :digraph)
+    g.node[:style] = :filled
+    g.node[:shape] = :box
+
+    h = Hash.new
+
+    h[method.name] = g.add_node(method.to_s)
+    
+    method.calls.each do |m|
+      h[m.name] = g.add_node(m.to_s)
+    end
+
+    puts "Adding edges..."
+    method.calls.each do |callee|
+      if !h[callee.name].nil?
+        g.add_edge(h[method.name], h[callee.name])
+      end
+    end
+
+    puts "Writing graph to file #{image_path}"
+    g.output(:png => image_path)
+  end
+
+  def self.write_index_to_file(structure, file_path)
+    methods = structure.all_methods.clone
+    template = self.read_template('index.html.erb')
+
+    puts "Writing file #{file_path}"
+
+    output = ERB.new(template).result(binding)
+    self.write_to_file(file_path, output)
+  end
+
+  def self.highlight(text)
+    result = Uv.parse( text, "xhtml", "fortran", true, "dawn")
+  end
+
+  def self.read_template(template)
+    File.read(File.join($base_path, TEMPLATE_DIR, template))
+  end
+
+  def self.write_method_to_file(m, file_path)
+    template = self.read_template('method.html.erb')
+
+    puts "Writing file #{file_path}"
+
+    output = ERB.new(template).result(binding)
+    self.write_to_file(file_path, output)
+  end
+private
+  def self.write_to_file(filename, contents)
+    file = File.open(filename, 'w+')
+    file.write contents
+    file.close
+  end
+end
+
 
 $directory = 'doc/structure'
 opts = OptionParser.new(ARGV) do |o|
