@@ -280,10 +280,12 @@ class StructureRefactorOutput
   def self.write_output(structure, output_path, overwrite = false)
     s = structure
     FileUtils.rm_rf(output_path) if overwrite
-    FileUtils.mkdir(output_path)
+    FileUtils.mkdir_p(output_path)
 
     s.all_methods.each do |m|
-      write_method_to_file(m, File.join(output_path, m.name.to_fortran_file))
+      output_dir = File.join(output_path, File.basename(m.file.filename))
+      FileUtils.mkdir_p(output_dir)
+      write_method_to_file(m, File.join(output_dir, m.name.to_fortran_file))
     end
   end
 
