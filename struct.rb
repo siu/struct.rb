@@ -23,7 +23,7 @@ class StructureExtractor
     @dir = path
 
     pattern = File.join(@dir, '**', '*.f')
-    @files = Dir.glob(pattern)
+    @files = Dir.glob(pattern).select { |f| File.file?(f) }
 
     @files_info = @files.map do |filename|
       puts "Searching for declarations in #{filename}..."
