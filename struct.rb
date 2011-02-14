@@ -12,7 +12,7 @@ require 'erb'
 
 $project_title = 'Unnamed'
 STRUCT_PATH = File.expand_path(File.dirname(__FILE__))
-FOOTER = %q{<p><em>Analysis by struct.rb - David Siñuela Pastor</em></p>}
+FOOTER = %q{<p><em>Analysis by <a href="http://github.com/siu/struct.rb">struct.rb</a> - David Siñuela Pastor</em></p>}
 TEMPLATE_DIR = File.join(STRUCT_PATH, 'templates')
 CSS_DIR = File.join(STRUCT_PATH, 'css')
 
@@ -31,7 +31,7 @@ class StructureExtractor
     end
 
     @all_methods = @files_info.map { |fi| fi.methods }.flatten.uniq {|a,b| a.name <=> b.name }.sort {|a,b| a.name <=> b.name }
-    @all_function_names = @all_methods.collect { |m| m.name.scan(/^function:(\w*)/i) }.flatten.sort.uniq
+    @all_function_names = @all_methods.collect { |m| m.name.scan(/^function:(\w+)/i) }.flatten.sort.uniq
     @files_info.each do |f|
       puts "File #{f.filename}..."
       f.methods.each do |m|
@@ -81,7 +81,7 @@ private
   def extract_methods(filename)
     file = File.open(filename)
 
-    declaration = Regexp.new(/^[^!*c]\s*(?:\w+\s+)*(function|subroutine)[ \t]+(\w+).*$/i)
+    declaration = Regexp.new(/^[^!*c]\s*(?:[\w\*]+\s+)*(program|function|subroutine|entry)[ \t]+(\w+).*$/i)
 
     last_line = 0
     methods = file.lines.map do |line|
@@ -142,15 +142,15 @@ class MethodDefinition
     call_lines = File.open(file.filename).entries[start_line..end_line-1].map do |line|
       line.scan(sub_call).flatten.uniq.collect(&:downcase)
     end.compact.flatten.uniq.sort
-    call_lines.map{ |c| all_methods.find { |m| m.name == "subroutine:#{c}" } }.compact
+    call_lines.map{ |c| all_methods.find { |m| m.name =~ /(subroutine|entry):#{c}/ } }.compact
   end
 
   def extract_function_calls(function_list, all_methods)
-    fun_call = Regexp.new(/^[^*c]\s*.*(#{function_list.join("|")})\(/i)
+    fun_call = Regexp.new(/^[^*c].*(#{function_list.join("|")})\s*\(/i)
     call_lines = File.open(file.filename).entries[start_line..end_line-1].map do |line|
       line.scan(fun_call).flatten.uniq.collect(&:downcase)
     end.compact.flatten.uniq.sort
-    call_lines.map{|c| all_methods.find { |m| m.name == "function:#{c}" } }.compact
+    call_lines.map{|c| all_methods.find { |m| m.name =~ /function:#{c}/ } }.compact
   end
 
   def to_s
@@ -169,19 +169,23 @@ private
 end
 
 class StructureExtractorHtmlOutput
-  require 'uv'
   THEME = 'dawn'
 
   def self.write_output(structure, output_path, overwrite = false)
     s = structure
     FileUtils.rm_rf(output_path) if overwrite
-    FileUtils.mkdir(output_path)
+    FileUtils.mkdir_p(output_path)
     FileUtils.cp_r(CSS_DIR, output_path)
+    FileUtils.mkdir_p(File.join(output_path, 'img'))
+    FileUtils.mkdir_p(File.join(output_path, 'pdf'))
     write_index_to_file(structure, File.join(output_path, 'index.html'))
 
     s.all_methods.each do |m|
+      self.graph_for_method(m, File.join(output_path, 'img', "#{m.name}.png"))
       write_method_to_file(m, File.join(output_path, m.name.to_html_page))
     end
+
+    #self.generate_graph(structure, output_path)
   end
 
   def self.write_index_to_file(structure, file_path)
@@ -195,7 +199,8 @@ class StructureExtractorHtmlOutput
   end
 
   def self.highlight(text)
-    result = Uv.parse( text, "xhtml", "fortran", true, "dawn")
+    require 'uv'
+    result = Uv.parse( text, "xhtml", "fortran", true, THEME)
   end
 
   def self.read_template(template)
@@ -210,6 +215,59 @@ class StructureExtractorHtmlOutput
     output = ERB.new(template).result(binding)
     self.write_to_file(file_path, output)
   end
+
+  def self.generate_graph(structure, output_path)
+    require 'graphviz'
+    g = GraphViz::new( :G, :type => :digraph)
+    g.node[:style] = :filled
+    g.node[:shape] = :box
+
+    h = Hash.new
+    
+    structure.all_methods.each do |m|
+      h[m.name] = g.add_node(m.to_s)
+    end
+
+    puts "Adding edges"
+    structure.all_methods.each do |m|
+      m.calls.each do |callee|
+        if !h[m.name].nil? && !h[callee.name].nil?
+          g.add_edge(h[m.name], h[callee.name])
+        end
+      end
+    end
+
+    puts 'Writing graph pdf...'
+    g.output(:pdf => File.join(output_path, 'pdf', 'struct.pdf'))
+    puts 'Writing graph to file...'
+    g.output(:png => File.join(output_path, 'img', 'struct.png'))
+  end
+
+  def self.graph_for_method(method, image_path)
+    require 'graphviz'
+    g = GraphViz::new( :G, :type => :digraph)
+    g.node[:style] = :filled
+    g.node[:shape] = :box
+
+    h = Hash.new
+
+    h[method.name] = g.add_node(method.to_s)
+    
+    method.calls.each do |m|
+      h[m.name] = g.add_node(m.to_s)
+    end
+
+    puts "Adding edges..."
+    method.calls.each do |callee|
+      if !h[callee.name].nil?
+        g.add_edge(h[method.name], h[callee.name])
+      end
+    end
+
+    puts "Writing graph to file #{image_path}"
+    g.output(:png => image_path)
+  end
+
 private
   def self.write_to_file(filename, contents)
     file = File.open(filename, 'w+')
@@ -243,7 +301,7 @@ private
   end
 end
 
-$directory = 'doc'
+$directory = 'doc/structure'
 $output = StructureExtractorHtmlOutput
 $overwrite = false
 

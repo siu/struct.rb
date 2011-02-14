@@ -20,6 +20,9 @@
 
       <div class="method-info">File: <%= m.file.filename %></div>
 
+      <h2>Diagram</h2>
+      <img src="img/<%= m.name %>.png" />
+
       <h2>All calls</h2>
       <ul>
         <% m.calls.each do |c| %>
