@@ -9,11 +9,12 @@ require 'rubygems'
 require 'optparse'
 require 'fileutils'
 require 'erb'
-require 'uv'
 
 $project_title = 'Unnamed'
+STRUCT_PATH = File.expand_path(File.dirname(__FILE__))
 FOOTER = %q{<p><em>Analysis by struct.rb - David Siñuela Pastor</em></p>}
-TEMPLATE_DIR = 'templates'
+TEMPLATE_DIR = File.join(STRUCT_PATH, 'templates')
+CSS_DIR = File.join(STRUCT_PATH, 'css')
 
 class StructureExtractor
   attr_accessor :all_methods, :all_function_names, :files_info, :files
@@ -54,54 +55,11 @@ end
 
 class String
   def to_html_page
-    self.gsub(/:/, '_') << '.html'
-  end
-end
-
-class StructureExtractorHtmlOutput
-  THEME = 'dawn'
-  def self.write_output(structure, output_path)
-    s = structure
-    Dir.mkdir(output_path)
-    FileUtils.cp_r('css', output_path)
-    write_index_to_file(structure, File.join(output_path, 'index.html'))
-
-    s.all_methods.each do |m|
-      write_method_to_file(m, File.join(output_path, m.name.to_html_page))
-    end
+    self.gsub(/:/, '_') << '.html' 
   end
 
-  def self.write_index_to_file(structure, file_path)
-    methods = structure.all_methods.clone
-    template = self.read_template('index.html.erb')
-
-    puts "Writing file #{file_path}"
-
-    output = ERB.new(template).result(binding)
-    self.write_to_file(file_path, output)
-  end
-
-  def self.highlight(text)
-    result = Uv.parse( text, "xhtml", "fortran", true, "dawn")
-  end
-
-  def self.read_template(template)
-    File.read(File.join(TEMPLATE_DIR, template))
-  end
-
-  def self.write_method_to_file(m, file_path)
-    template = self.read_template('method.html.erb')
-
-    puts "Writing file #{file_path}"
-
-    output = ERB.new(template).result(binding)
-    self.write_to_file(file_path, output)
-  end
-private
-  def self.write_to_file(filename, contents)
-    file = File.open(filename, 'w+')
-    file.write contents
-    file.close
+  def to_fortran_file
+    self.split(':').last << '.f'
   end
 end
 
@@ -208,19 +166,98 @@ private
   def update_lines
     @lines = end_line - start_line
   end
+end
 
+class StructureExtractorHtmlOutput
+  require 'uv'
+  THEME = 'dawn'
 
+  def self.write_output(structure, output_path, overwrite = false)
+    s = structure
+    FileUtils.rm_rf(output_path) if overwrite
+    FileUtils.mkdir(output_path)
+    FileUtils.cp_r(CSS_DIR, output_path)
+    write_index_to_file(structure, File.join(output_path, 'index.html'))
+
+    s.all_methods.each do |m|
+      write_method_to_file(m, File.join(output_path, m.name.to_html_page))
+    end
+  end
+
+  def self.write_index_to_file(structure, file_path)
+    methods = structure.all_methods.clone
+    template = self.read_template('index.html.erb')
+
+    puts "Writing file #{file_path}"
+
+    output = ERB.new(template).result(binding)
+    self.write_to_file(file_path, output)
+  end
+
+  def self.highlight(text)
+    result = Uv.parse( text, "xhtml", "fortran", true, "dawn")
+  end
+
+  def self.read_template(template)
+    File.read(File.join(TEMPLATE_DIR, template))
+  end
+
+  def self.write_method_to_file(m, file_path)
+    template = self.read_template('method.html.erb')
+
+    puts "Writing file #{file_path}"
+
+    output = ERB.new(template).result(binding)
+    self.write_to_file(file_path, output)
+  end
+private
+  def self.write_to_file(filename, contents)
+    file = File.open(filename, 'w+')
+    file.write contents
+    file.close
+  end
+end
+
+class StructureRefactorOutput
+  def self.write_output(structure, output_path, overwrite = false)
+    s = structure
+    FileUtils.rm_rf(output_path) if overwrite
+    FileUtils.mkdir(output_path)
+
+    s.all_methods.each do |m|
+      write_method_to_file(m, File.join(output_path, m.name.to_fortran_file))
+    end
+  end
+
+  def self.write_method_to_file(m, file_path)
+    puts "Writing file #{file_path}"
+
+    output = m.source
+    self.write_to_file(file_path, output)
+  end
+private
+  def self.write_to_file(filename, contents)
+    file = File.open(filename, 'w+')
+    file.write contents
+    file.close
+  end
 end
 
 $directory = 'doc'
+$output = StructureExtractorHtmlOutput
+$overwrite = false
+
 opts = OptionParser.new(ARGV) do |o|
   o.banner = 'Usage: struct.rb [options] source_directory'
   o.on('-d DIRECTORY', '--directory', 'Output directory') { |d| $directory = d}
   o.on('-t TITLE', '--title', 'Project title') { |t| $project_title = t}
   o.on('-h') { puts o; exit }
+  o.on('-f', '--force', 'Force output folder overwrite') { $overwrite = true }
+  o.on('-r', '--refactor') { $directory = 'refactor'; $output = StructureRefactorOutput }
   o.parse!
 end
 path = File.join(File.expand_path('.'), $directory)
 
 s = StructureExtractor.new(File.expand_path(ARGV.last))
-StructureExtractorHtmlOutput::write_output(s, path)
+$output::write_output(s, path, $overwrite)
+
